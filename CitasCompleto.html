@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Citas</title>
+  <!-- Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <!-- Flatpickr (Calendario) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <!-- Navbar -->
+  <nav class="bg-blue-600 text-white p-4">
+    <div class="container mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold">Sistema de Citas</h1>
+      <div>
+        <a href="#" class="mx-2" onclick="showPage('home')">Inicio</a>
+        <a href="#" class="mx-2" onclick="showPage('profile')">Perfil</a>
+        <a href="#" class="mx-2" id="adminLink">Administración</a>
+        <a href="#" class="mx-2" onclick="logout()">Cerrar Sesión</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Página de Inicio -->
+  <div id="home" class="container mx-auto p-4">
+    <h2 class="text-3xl font-bold mb-4">Bienvenido al Sistema de Citas</h2>
+    <p class="mb-4">Agenda y gestiona tus citas de manera sencilla.</p>
+    <button onclick="showPage('auth')" class="bg-blue-500 text-white px-4 py-2 rounded">Iniciar Sesión</button>
+    <button onclick="showPage('auth')" class="bg-green-500 text-white px-4 py-2 rounded ml-2">Registrarse</button>
+  </div>
+
+  <!-- Página de Registro/Inicio de Sesión -->
+  <div id="auth" class="container mx-auto p-4 hidden">
+    <h2 class="text-3xl font-bold mb-4">Iniciar Sesión / Registrarse</h2>
+    <form id="loginForm" class="mb-4">
+      <input type="email" id="loginEmail" placeholder="Correo" class="w-full p-2 mb-2 border rounded">
+      <input type="password" id="loginPassword" placeholder="Contraseña" class="w-full p-2 mb-2 border rounded">
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Iniciar Sesión</button>
+    </form>
+    <form id="registerForm" class="mb-4">
+      <input type="text" id="registerName" placeholder="Nombre" class="w-full p-2 mb-2 border rounded">
+      <input type="email" id="registerEmail" placeholder="Correo" class="w-full p-2 mb-2 border rounded">
+      <input type="password" id="registerPassword" placeholder="Contraseña" class="w-full p-2 mb-2 border rounded">
+      <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Registrarse</button>
+    </form>
+  </div>
+
+  <!-- Página de Perfil -->
+  <div id="profile" class="container mx-auto p-4 hidden">
+    <h2 class="text-3xl font-bold mb-4">Perfil de Usuario</h2>
+    <div class="bg-white p-4 rounded shadow">
+      <p><strong>Nombre:</strong> <span id="userName">Usuario</span></p>
+      <p><strong>Correo:</strong> <span id="userEmail">usuario@example.com</span></p>
+      <p><strong>Rol:</strong> <span id="userRole">Usuario</span></p>
+    </div>
+  </div>
+
+  <!-- Página de Agendar Cita -->
+  <div id="appointment" class="container mx-auto p-4 hidden">
+    <h2 class="text-3xl font-bold mb-4">Agendar Cita</h2>
+    <form id="appointmentForm">
+      <input type="text" id="datePicker" placeholder="Selecciona fecha y hora" class="w-full p-2 mb-2 border rounded">
+      <textarea id="appointmentDescription" placeholder="Descripción" class="w-full p-2 mb-2 border rounded"></textarea>
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Agendar</button>
+    </form>
+    <div id="appointmentList" class="mt-4"></div>
+  </div>
+
+  <!-- Página de Administración -->
+  <div id="admin" class="container mx-auto p-4 hidden">
+    <h2 class="text-3xl font-bold mb-4">Administración de Citas</h2>
+    <div class="mb-4">
+      <input type="text" id="filterDate" placeholder="Filtrar por fecha (YYYY-MM-DD)" class="w-full p-2 mb-2 border rounded">
+      <input type="text" id="filterUser" placeholder="Filtrar por usuario" class="w-full p-2 mb-2 border rounded">
+      <button onclick="loadAllAppointments()" class="bg-blue-500 text-white px-4 py-2 rounded">Filtrar</button>
+    </div>
+    <div id="allAppointmentsList" class="mt-4"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    // Importar Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyArLJ5OM5uxVDs-8PGQHRGSO2f-0wLXJ4I",
+      authDomain: "citas1-c362d.firebaseapp.com",
+      projectId: "citas1-c362d",
+      storageBucket: "citas1-c362d.firebasestorage.app",
+      messagingSenderId: "887970795214",
+      appId: "1:887970795214:web:8ed90f834680f8e04a4a9f",
+      measurementId: "G-7ECW74N30J"
+    };
+
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Mostrar páginas
+    function showPage(pageId) {
+      document.querySelectorAll('div[id]').forEach(div => div.classList.add('hidden'));
+      document.getElementById(pageId).classList.remove('hidden');
+    }
+
+    // Registro de usuario
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // Guardar información adicional del usuario en Firestore
+        await addDoc(collection(db, 'users'), {
+          uid: userCredential.user.uid,
+          name: name,
+          email: email,
+          isAdmin: false // Por defecto, no es administrador
+        });
+
+        alert('Usuario registrado correctamente');
+        showPage('profile');
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userEmail').textContent = email;
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    });
+
+    // Inicio de sesión
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        alert('Inicio de sesión exitoso');
+        showPage('profile');
+        loadProfile(); // Cargar perfil del usuario
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    });
+
+    // Cerrar sesión
+    function logout() {
+      signOut(auth).then(() => {
+        alert('Sesión cerrada');
+        showPage('home');
+      }).catch((error) => {
+        alert(`Error: ${error.message}`);
+      });
+    }
+
+    // Agendar cita
+    document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const date = document.getElementById('datePicker').value;
+      const description = document.getElementById('appointmentDescription').value;
+
+      try {
+        await addDoc(collection(db, 'citas'), {
+          date,
+          description,
+          userId: auth.currentUser.uid
+        });
+        alert('Cita agendada correctamente');
+        loadAppointments();
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    });
+
+    // Cargar citas del usuario
+    async function loadAppointments() {
+      const q = query(collection(db, 'citas'), where('userId', '==', auth.currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      const appointmentList = document.getElementById('appointmentList');
+      appointmentList.innerHTML = '';
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        appointmentList.innerHTML += `<div class="bg-white p-2 mb-2 rounded shadow">${data.date} - ${data.description}</div>`;
+      });
+    }
+
+    // Cargar todas las citas (para administradores)
+    async function loadAllAppointments() {
+      const filterDate = document.getElementById('filterDate').value;
+      const filterUser = document.getElementById('filterUser').value;
+
+      let q = collection(db, 'citas');
+
+      // Aplicar filtros si existen
+      if (filterDate) {
+        q = query(q, where('date', '>=', filterDate), where('date', '<=', `${filterDate}T23:59:59`));
+      }
+      if (filterUser) {
+        q = query(q, where('userId', '==', filterUser));
+      }
+
+      const querySnapshot = await getDocs(q);
+      const allAppointmentsList = document.getElementById('allAppointmentsList');
+      allAppointmentsList.innerHTML = '';
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        allAppointmentsList.innerHTML += `
+          <div class="bg-white p-2 mb-2 rounded shadow">
+            <p><strong>Fecha:</strong> ${data.date}</p>
+            <p><strong>Descripción:</strong> ${data.description}</p>
+            <p><strong>Usuario:</strong> ${data.userId}</p>
+            <button onclick="deleteAppointment('${doc.id}')" class="bg-red-500 text-white px-2 py-1 rounded mt-2">Eliminar</button>
+          </div>
+        `;
+      });
+    }
+
+    // Eliminar cita (para administradores)
+    async function deleteAppointment(appointmentId) {
+      if (confirm('¿Estás seguro de eliminar esta cita?')) {
+        try {
+          await deleteDoc(doc(db, 'citas', appointmentId));
+          alert('Cita eliminada correctamente');
+          loadAllAppointments(); // Recargar la lista
+        } catch (error) {
+          alert(`Error: ${error.message}`);
+        }
+      }
+    }
+
+    // Verificar si el usuario es administrador
+    async function checkIfAdmin() {
+      const user = auth.currentUser;
+      if (!user) return false;
+
+      const q = query(collection(db, 'users'), where('uid', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        return userData.isAdmin === true;
+      }
+      return false;
+    }
+
+    // Cargar perfil del usuario
+    async function loadProfile() {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const q = query(collection(db, 'users'), where('uid', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        document.getElementById('userName').textContent = userData.name;
+        document.getElementById('userEmail').textContent = userData.email;
+        document.getElementById('userRole').textContent = userData.isAdmin ? 'Administrador' : 'Usuario';
+      }
+    }
+
+    // Restringir acceso a la página de administración
+    document.getElementById('adminLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const isAdmin = await checkIfAdmin();
+      if (isAdmin) {
+        showPage('admin');
+        loadAllAppointments(); // Cargar citas al acceder a la página
+      } else {
+        alert('No tienes permisos para acceder a esta página.');
+      }
+    });
+
+    // Inicializar Flatpickr
+    flatpickr("#datePicker", {
+      enableTime: true,
+      dateFormat: "Y-m-d H:i",
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.min.js"></script>
+</body>
+</html>
